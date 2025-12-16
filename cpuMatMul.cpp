@@ -4,47 +4,55 @@
 #include <cstdlib>
 
 
-class MatSPre {
-public:
-    const int n_cols;
+class MatrixFP32{
+    public: 
     const int n_rows;
-    float* ptr;
+    const int n_cols;
 
-    MatSPre(int n_rows, int n_cols);
-    ~MatSPre();  
+    float *ptr;
+
+    MatrixFP32(int n_rows, int n_cols);
+
+    void Free_Mat();
 };
 
-MatSPre::MatSPre(int n_rows_, int n_cols_)
-    : n_rows(n_rows_), n_cols(n_cols_)
-{
+MatrixFP32::MatrixFP32(int n_rows_, int n_cols) : n_rows(n_rows_), n_cols(n_cols){
     ptr = new float[n_rows * n_cols];
 }
 
-MatSPre::~MatSPre() {
-    delete[] ptr;
+void MatrixFP32::Free_Mat(){
+     delete[] ptr;
 }
 
-void cpu_matmul(MatSPre matA, MatSPre matB, MatSPre matC) {
-    int n_rowsA = matA.n_rows;
-    int n_colsA = matA.n_cols;
 
-    int n_rowsB = matB.n_rows;
-    int n_colsB = matB.n_cols;
+void cpuMatMul(MatrixFP32 matA, MatrixFP32 matB, MatrixFP32 matC) {
+    int rowA = matA.n_rows;
+    int colA = matA.n_cols;
 
-    int n_rowsC = matC.n_rows;
-    int n_colsC = matC.n_cols;
+    int rowB = matB.n_rows;
+    int colB = matB.n_cols;
 
-    for (int row = 0; row < n_rowsA; row++) {
-        for (int col = 0; col < n_rowsB; col++) {
+    int rowC = matC.n_rows;
+    int colC = matC.n_cols;
+
+    assert (colA == rowB && "cols in A should equal rows in B.");
+    assert (rowA == rowC && "rows in A should equal rows in C.");
+    assert (colB == colC && "cols in B should equal cols in C.");
+
+
+    for (int i = 0; i < rowA; i++) {
+        for (int j = 0; j < colB; j++) {
             float accum = 0.0f;
-            for (int k = 0; k < n_colsB; k++) {
-                accum += matA.ptr[row*n_colsA+k] * matB.ptr[k * n_colsB + col];
+
+            for (int k = 0; k < colA; k++) {
+                accum += matA.ptr[i * colA + k] * matB.ptr[j * colB + k];
             }
 
-            matC.ptr[row * n_colsC + col] = accum;
+            matC.ptr[i * colC + j] = accum;
         }
     }
 }
+
 
 
 
