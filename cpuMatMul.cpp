@@ -1,86 +1,68 @@
-#include <algorithm>
+#include <cuda_runtime.h>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 
+#define cuda_check(call)                                   \
+do {                                                       \
+    cudaError_t err = call;                                \
+    if (err != cudaSuccess) {                              \
+        fprintf(stderr,                                   \
+                "CUDA error %s:%d: %s\n",                  \
+                __FILE__, __LINE__,                        \
+                cudaGetErrorString(err));                  \
+        exit(EXIT_FAILURE);                                \
+    }                                                      \
+} while (0)
 
-class MatrixFP32{
-    public: 
+
+
+class MatrixFP32 {
+public:
     const int n_rows;
     const int n_cols;
-
-    float *ptr;
     const bool on_device;
+    float* ptr;
 
-    MatrixFP32(int n_rows, int n_cols);
+    MatrixFP32(int rows, int cols, bool device);
+    ~MatrixFP32();
 
-    void Free_Mat();
+    void copy_to_device(MatrixFP32& d_mat);
+    void copy_to_host(MatrixFP32& h_mat);
 };
 
-MatrixFP32::MatrixFP32(int n_rows_, int n_cols) : n_rows(n_rows_), n_cols(n_cols){
-    if (on_device == false ) {
-
-    ptr = new float[n_rows * n_cols];
-    } else {
-        cudaError_t err = cudaMalloc((void**) &ptr, n_rows * n_cols * sizeof(float));
-    }
+MatrixFP32::MatrixFP32(int r, int c, bool device)
+    : n_rows(r), n_cols(c), on_device(device) {
+    if (on_device)
+        cuda_check(cudaMalloc(&ptr, r * c * sizeof(float)));
+    else
+        ptr = new float[r * c];
 }
 
-void MatrixFP32::Free_Mat(){
+MatrixFP32::~MatrixFP32() {
+    if (on_device) cudaFree(ptr);
+    else delete[] ptr;
+};
 
-    if (on_device == false)
-     delete[] ptr;
-} else {
-    cudaFree(ptr);
-}
 
-void MatrixFP32::DeviceCopy(MatrixFP32 d_Mat){
-assert(on_device == false && "Matrix must be in host memory");
-assert(d_mat.on_device == true && "Input Matrix to this function must be in device memory");
-
-cudaError_t err = cudaMemcpy(d_mat.ptr, ptr, n_rows*n_cols*sizeof(float), cudaMemcpyHostToDevice);
-cuda_check(err);
-}
-
-void MatrixFP32::copy_to_host(MatrixFP32 h_mat)
+void cpuMatMul(const MatrixFP32& matA,
+               const MatrixFP32& matB,
+               MatrixFP32& matC)
 {
+    assert(!matA.on_device && !matB.on_device && !matC.on_device);
 
-    assert(on_device == true && "Matrix must be in device memory");
-    assert(h_mat.on_device == false && "Input Matrix to this function must be in host memory");
-
-    
-    cudaError_t err = cudaMemcpy(h_mat.ptr, ptr, n_rows*n_cols*sizeof(float), cudaMemcpyDeviceToHost);
-    cuda_check(err);
-}
-
-
-void cpuMatMul(MatrixFP32 matA, MatrixFP32 matB, MatrixFP32 matC) {
-    int rowA = matA.n_rows;
-    int colA = matA.n_cols;
-
-    int rowB = matB.n_rows;
-    int colB = matB.n_cols;
-
-    int rowC = matC.n_rows;
-    int colC = matC.n_cols;
-
-    assert (colA == rowB && "cols in A should equal rows in B.");
-    assert (rowA == rowC && "rows in A should equal rows in C.");
-    assert (colB == colC && "cols in B should equal cols in C.");
-
-
-    for (int i = 0; i < rowA; i++) {
-        for (int j = 0; j < colB; j++) {
+    for (int i = 0; i < matA.n_rows; i++) {
+        for (int j = 0; j < matB.n_cols; j++) {
             float accum = 0.0f;
-
-            for (int k = 0; k < colA; k++) {
-                accum += matA.ptr[i * colA + k] * matB.ptr[j * colB + k];
+            for (int k = 0; k < matA.n_cols; k++) {
+                accum += matA.ptr[i * matA.n_cols + k] *
+                         matB.ptr[k * matB.n_cols + j];
             }
-
-            matC.ptr[i * colC + j] = accum;
+            matC.ptr[i * matC.n_cols + j] = accum;
         }
     }
 }
+
 
 
 
