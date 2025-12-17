@@ -18,3 +18,9 @@ __global__ void naivematmul(float *d_A, float *d_B, float *d_C, int CnCol, int C
         d_C[row * N + col] = 1 * accum + 0 * d_C[row * N + col];
     }
 }
+
+void naivegemm(float *d_A, float *d_B, float *d_C, int CnCol, int CnRow, int N){ 
+    dim3 blockDim(32, 32, 1);
+    dim3 gridDim(ceil(CnRow/32), ceil(CnCol/32), 1);
+    naivematmul<<<gridDim, blockDim>>>(d_A, d_B, d_C, CnCol, CnRow, N);
+}
